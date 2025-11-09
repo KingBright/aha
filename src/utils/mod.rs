@@ -5,9 +5,7 @@ pub mod video_utils;
 
 use aha_openai_dive::v1::resources::{
     chat::{
-        ChatCompletionChoice, ChatCompletionChunkChoice, ChatCompletionChunkResponse,
-        ChatCompletionResponse, ChatMessage, ChatMessageContent, DeltaChatMessage, DeltaFunction,
-        DeltaToolCall, Function, ToolCall,
+        ChatCompletionChoice, ChatCompletionChunkChoice, ChatCompletionChunkResponse, ChatCompletionParameters, ChatCompletionResponse, ChatMessage, ChatMessageContent, ChatMessageContentPart, DeltaChatMessage, DeltaFunction, DeltaToolCall, Function, ToolCall
     },
     shared::FinishReason,
 };
@@ -280,4 +278,26 @@ pub fn get_logit_processor(
             LogitsProcessor::from_sampling(34562, sampling)
         }
     }
+}
+
+pub fn extract_mes(mes: &ChatCompletionParameters) -> Result<Vec<(String, String)>> {
+    let mut mes_vec = Vec::new();
+    for chat_mes in mes.messages.clone() {
+        if let ChatMessage::User { content, .. } = chat_mes.clone()
+            && let ChatMessageContent::ContentPart(part_vec) = content
+        {
+            for part in part_vec {
+                if let ChatMessageContentPart::Text(text_part) = part {
+                    let text = text_part.text;
+                    mes_vec.push(("<|User|>".to_string(), text));
+                }
+            }
+        } else if let ChatMessage::Assistant { content, .. } = chat_mes.clone()
+            && let Some(cont) = content
+            && let ChatMessageContent::Text(c) = cont
+        {
+            mes_vec.push(("<|Assistant|>".to_string(), c));
+        }
+    }
+    Ok(mes_vec)
 }

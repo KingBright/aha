@@ -3,6 +3,7 @@ pub mod minicpm4;
 pub mod qwen2_5vl;
 pub mod qwen3vl;
 pub mod voxcpm;
+pub mod deepseek_ocr;
 
 use aha_openai_dive::v1::resources::chat::{
     ChatCompletionChunkResponse, ChatCompletionParameters, ChatCompletionResponse,

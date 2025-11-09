@@ -1,8 +1,13 @@
+use std::collections::HashSet;
 use std::io::Cursor;
 
-use anyhow::{Result, anyhow};
+use aha_openai_dive::v1::resources::chat::{
+    ChatCompletionParameters, ChatMessage, ChatMessageContent, ChatMessageContentPart,
+};
+use anyhow::{Ok, Result, anyhow};
 use base64::{Engine, engine::general_purpose};
-use image::{DynamicImage, ImageReader};
+use candle_core::{DType, Device, Tensor};
+use image::{DynamicImage, ImageBuffer, ImageReader, Rgb, RgbImage, imageops};
 
 pub fn load_image_from_url(url: &str) -> Result<DynamicImage> {
     let response = reqwest::blocking::get(url)
@@ -57,4 +62,174 @@ pub fn get_image(file: &str) -> Result<DynamicImage> {
         return Ok(img);
     }
     Err(anyhow!("get image from message failed".to_string()))
+}
+
+pub fn extract_image_url(mes: &ChatCompletionParameters) -> Result<Vec<String>> {
+    let mut img_vec = Vec::new();
+    for chat_mes in mes.messages.clone() {
+        if let ChatMessage::User { content, .. } = chat_mes
+            && let ChatMessageContent::ContentPart(part_vec) = content
+        {
+            for part in part_vec {
+                if let ChatMessageContentPart::Image(img_part) = part {
+                    let img_url = img_part.image_url;
+                    img_vec.push(img_url.url);
+                }
+            }
+        }
+    }
+    Ok(img_vec)
+}
+
+pub fn extract_images(mes: &ChatCompletionParameters) -> Result<Vec<DynamicImage>> {
+    let img_url_vec = extract_image_url(mes)?;
+    let mut img_vec = Vec::new();
+    for url in img_url_vec {
+        let img = get_image(&url)?;
+        img_vec.push(img);
+    }
+    Ok(img_vec)
+}
+
+pub fn generate_target_ratios_sorted(min_num: u32, max_num: u32) -> Vec<(u32, u32)> {
+    let mut target_ratios = HashSet::new();
+
+    for n in min_num..=max_num {
+        for i in 1..=n {
+            for j in 1..=n {
+                let product = i * j;
+                if product <= max_num && product >= min_num {
+                    target_ratios.insert((i, j));
+                }
+            }
+        }
+    }
+    // Convert to vector and sort by the product of elements (i*j)
+    let mut sorted_ratios: Vec<(u32, u32)> = target_ratios.into_iter().collect();
+    sorted_ratios.sort_by_key(|&(i, j)| i * j);
+
+    sorted_ratios
+}
+
+pub fn find_closest_aspect_ratio(
+    aspect_ratio: f64,
+    target_ratios: &[(u32, u32)],
+    width: u32,
+    height: u32,
+    image_size: u32,
+) -> (u32, u32) {
+    let mut best_ratio_diff = f64::INFINITY;
+    let mut best_ratio = (1, 1);
+    let area = width * height;
+
+    for &ratio in target_ratios {
+        let target_aspect_ratio = ratio.0 as f64 / ratio.1 as f64;
+        let ratio_diff = (aspect_ratio - target_aspect_ratio).abs();
+
+        if ratio_diff < best_ratio_diff {
+            best_ratio_diff = ratio_diff;
+            best_ratio = ratio;
+        } else if (ratio_diff - best_ratio_diff).abs() < 1e-10 {
+            let target_area = 0.5 * (image_size as f64).powi(2) * (ratio.0 * ratio.1) as f64;
+            if area as f64 > target_area {
+                best_ratio = ratio;
+            }
+        }
+    }
+
+    best_ratio
+}
+
+pub fn dynamic_preprocess(
+    image: &DynamicImage,
+    image_size: u32,
+    use_thumbnail: bool,
+) -> Result<(Vec<DynamicImage>, (u32, u32))> {
+    let orig_width = image.width();
+    let orig_height = image.height();
+    let aspect_ratio = orig_width as f64 / orig_height as f64;
+    let target_ratios = generate_target_ratios_sorted(2, 9);
+    let target_aspect_ratio = find_closest_aspect_ratio(
+        aspect_ratio,
+        &target_ratios,
+        orig_width,
+        orig_height,
+        image_size,
+    );
+    let target_width = image_size * target_aspect_ratio.0;
+    let target_height = image_size * target_aspect_ratio.1;
+    let blocks = target_aspect_ratio.0 * target_aspect_ratio.1;
+    let mut resized_img = image.resize_exact(
+        target_width,
+        target_height,
+        image::imageops::FilterType::CatmullRom,
+    );
+    let mut processed_images = Vec::new();
+    let grid_width = target_width / image_size;
+    for i in 0..blocks {
+        // Calculate box coordinates
+        let x1 = (i % grid_width) * image_size;
+        let y1 = (i / grid_width) * image_size;
+
+        // Crop the image
+        let split_img = resized_img.crop(x1, y1, image_size, image_size);
+        processed_images.push(split_img);
+    }
+    assert_eq!(processed_images.len() as u32, blocks);
+
+    if use_thumbnail && processed_images.len() != 1 {
+        let thumbnail_img = image.resize_exact(
+            image_size,
+            image_size,
+            image::imageops::FilterType::CatmullRom,
+        );
+        processed_images.push(thumbnail_img);
+    }
+    Ok((processed_images, target_aspect_ratio))
+}
+
+pub fn resize_with_edge_padding(
+    img: &DynamicImage,
+    width: u32,
+    height: u32,
+    color: [u8; 3],
+) -> DynamicImage {
+    // 按图像原比例resize,可能不是输入的宽高
+    let mut img = img.resize(width, height, image::imageops::FilterType::CatmullRom);
+    // 使用全0像素填充为输入宽高
+    if img.height() != height || img.width() != width {
+        let (img_h, img_w) = (img.height(), img.width());
+        let img_buffer = img.to_rgb8();
+        let mut canvas: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            RgbImage::from_pixel(width, height, Rgb(color));
+        let x_offset = (width - img_w) / 2;
+        let y_offset = (height - img_h) / 2;
+        imageops::overlay(&mut canvas, &img_buffer, x_offset as i64, y_offset as i64);
+        img = DynamicImage::ImageRgb8(canvas);
+    }
+    img
+}
+
+pub fn img_transform(
+    img: &DynamicImage,
+    mean: &Tensor,
+    std: &Tensor,
+    device: &Device,
+    dtype: DType,
+) -> Result<Tensor> {
+    let img_h = img.height();
+    let img_w = img.width();
+    let img_vec = img.to_rgb8().into_raw();
+    // (h, w, c) => (c, h, w)
+    let img_tensor = Tensor::from_slice(&img_vec, (img_h as usize, img_w as usize, 3), device)?
+        .permute((2, 0, 1))?
+        .to_dtype(DType::F32)?;
+    // 0-255 rescale to 0-1
+    let img_tensor = img_tensor.affine(1.0 / 255.0, 0.)?;
+    // normalize
+    let img_tensor = img_tensor
+        .broadcast_sub(&mean.to_dtype(DType::F32)?)?
+        .broadcast_div(&std.to_dtype(DType::F32)?)?
+        .to_dtype(dtype)?;
+    Ok(img_tensor)
 }
