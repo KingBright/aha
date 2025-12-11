@@ -62,7 +62,7 @@ fn voxcpm1_5_weight() -> Result<()> {
             dict_to_hashmap.insert(k, v);
         }
     }
-    
+
     Ok(())
 }
 

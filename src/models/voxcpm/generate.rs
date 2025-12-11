@@ -6,7 +6,9 @@ use candle_nn::VarBuilder;
 
 use crate::{
     models::voxcpm::{
-        audio_vae::AudioVAE, config::{AudioVaeConfig, VoxCPMConfig}, model::VoxCPMModel,
+        audio_vae::AudioVAE,
+        config::{AudioVaeConfig, VoxCPMConfig},
+        model::VoxCPMModel,
         tokenizer::SingleChineseTokenizer,
     },
     utils::{find_type_files, get_device, get_dtype},
@@ -43,8 +45,8 @@ impl VoxCPMGenerate {
                 latent_dim: 64,
                 decoder_dim: 1536,
                 decoder_rates: vec![8, 8, 5, 2],
-                sample_rate: 16000
-            }
+                sample_rate: 16000,
+            },
         };
         let audio_vae = AudioVAE::new(
             vb_vae,
@@ -63,9 +65,9 @@ impl VoxCPMGenerate {
         // voxcpm0.5B模型文件是.bin类型， voxcpm1.5模型文件是.safetensors类型
         let vb_voxcpm = if model_list.is_empty() {
             let model_list = find_type_files(path, "safetensors")?;
-            unsafe { VarBuilder::from_mmaped_safetensors(&model_list, m_dtype, &device)? }
+            unsafe { VarBuilder::from_mmaped_safetensors(&model_list, m_dtype, device)? }
         } else {
-            dict_to_hashmap = HashMap::new();        
+            dict_to_hashmap = HashMap::new();
             let cfg_dtype = config.dtype.as_str();
             let m_dtype = get_dtype(dtype, cfg_dtype);
             for m in model_list {
@@ -141,13 +143,14 @@ impl VoxCPMGenerate {
             1000,
             10,
             2.0,
-            false,
+            // false,
             6.0,
         )?;
         Ok(audio)
     }
     pub fn generate_simple(&mut self, target_text: String) -> Result<Tensor> {
-        let audio = self.generate(target_text, None, None, 2, 100, 10, 2.0, false, 6.0)?;
+        // let audio = self.generate(target_text, None, None, 2, 100, 10, 2.0, false, 6.0)?;
+        let audio = self.generate(target_text, None, None, 2, 100, 10, 2.0, 6.0)?;
         Ok(audio)
     }
     pub fn generate(
@@ -159,7 +162,7 @@ impl VoxCPMGenerate {
         max_len: usize,
         inference_timesteps: usize,
         cfg_value: f64,
-        retry_badcase: bool,
+        // retry_badcase: bool,
         retry_badcase_ratio_threshold: f64,
     ) -> Result<Tensor> {
         let audio = self.voxcpm.generate(
@@ -170,7 +173,7 @@ impl VoxCPMGenerate {
             max_len,
             inference_timesteps,
             cfg_value,
-            retry_badcase,
+            // retry_badcase,
             retry_badcase_ratio_threshold,
         )?;
         Ok(audio)

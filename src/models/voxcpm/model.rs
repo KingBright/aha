@@ -486,7 +486,7 @@ impl VoxCPMModel {
         max_len: usize,
         inference_timesteps: usize,
         cfg_value: f64,
-        retry_badcase: bool,
+        // retry_badcase: bool,
         retry_badcase_ratio_threshold: f64,
     ) -> Result<Tensor> {
         let (text_token, text_mask, audio_feat, audio_mask) = match prompt_wav_path {

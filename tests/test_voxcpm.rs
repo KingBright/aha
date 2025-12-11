@@ -28,7 +28,7 @@ fn voxcpm_generate() -> Result<()> {
         100,
         10,
         2.0,
-        false,
+        // false,
         6.0,
     )?;
 

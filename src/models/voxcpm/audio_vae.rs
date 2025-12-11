@@ -444,7 +444,8 @@ impl CausalDecoder {
         }
         let idx = rates.len() + 2;
         let model_minus_2 = Snake1d::new(vb_model.pp(idx), output_dim)?;
-        let model_minus_1 = WNCausalConv1d::new(vb_model.pp(idx+1), output_dim, d_out, 7, 1, 3, 1, 1)?;
+        let model_minus_1 =
+            WNCausalConv1d::new(vb_model.pp(idx + 1), output_dim, d_out, 7, 1, 3, 1, 1)?;
         Ok(Self {
             model0,
             model1,
