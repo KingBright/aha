@@ -7,8 +7,9 @@ use candle_nn::VarBuilder;
 
 #[test]
 fn minicpm4_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/OpenBMB/MiniCPM4-0.5B/";
-    let model_list = find_type_files(model_path, "safetensors")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/OpenBMB/MiniCPM4-0.5B/", save_dir);
+    let model_list = find_type_files(&model_path, "safetensors")?;
     let device = Device::Cpu;
     for m in model_list {
         let weights = safetensors::load(m, &device)?;
@@ -23,8 +24,9 @@ fn minicpm4_weight() -> Result<()> {
 
 #[test]
 fn voxcpm_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/openbmb/VoxCPM-0.5B/";
-    let model_list = find_type_files(model_path, "pth")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/OpenBMB/VoxCPM-0.5B/", save_dir);
+    let model_list = find_type_files(&model_path, "pth")?;
     println!("model_list: {:?}", model_list);
     let dev = get_device(None);
     let mut dict_to_hashmap = HashMap::new();
@@ -48,8 +50,9 @@ fn voxcpm_weight() -> Result<()> {
 
 #[test]
 fn voxcpm1_5_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/OpenBMB/VoxCPM1.5/";
-    let model_list = find_type_files(model_path, "pth")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/OpenBMB/VoxCPM1.5/", save_dir);
+    let model_list = find_type_files(&model_path, "pth")?;
     println!("model_list: {:?}", model_list);
     // let dev = get_device(None);
     let mut dict_to_hashmap = HashMap::new();
@@ -68,8 +71,9 @@ fn voxcpm1_5_weight() -> Result<()> {
 
 #[test]
 fn qwen3vl_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/Qwen/Qwen3-VL-4B-Instruct/";
-    let model_list = find_type_files(model_path, "safetensors")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/Qwen/Qwen3-VL-4B-Instruct/", save_dir);
+    let model_list = find_type_files(&model_path, "safetensors")?;
 
     let device = Device::Cpu;
     for m in &model_list {
@@ -84,8 +88,9 @@ fn qwen3vl_weight() -> Result<()> {
 
 #[test]
 fn deepseekocr_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/deepseek-ai/DeepSeek-OCR/";
-    let model_list = find_type_files(model_path, "safetensors")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/deepseek-ai/DeepSeek-OCR/", save_dir);
+    let model_list = find_type_files(&model_path, "safetensors")?;
 
     let device = Device::Cpu;
     for m in &model_list {
@@ -103,8 +108,9 @@ fn deepseekocr_weight() -> Result<()> {
 
 #[test]
 fn hunyuanocr_weight() -> Result<()> {
-    let model_path = "/home/jhq/huggingface_model/Tencent-Hunyuan/HunyuanOCR/";
-    let model_list = find_type_files(model_path, "safetensors")?;
+    let save_dir = aha::utils::get_default_save_dir().ok_or(anyhow::anyhow!("Failed to get save dir"))?;
+    let model_path = format!("{}/Tencent-Hunyuan/HunyuanOCR/", save_dir);
+    let model_list = find_type_files(&model_path, "safetensors")?;
 
     let device = Device::Cpu;
     for m in &model_list {
